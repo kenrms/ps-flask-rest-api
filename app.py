@@ -1,19 +1,7 @@
-from flask import Flask, jsonify, request, Response, json
-
-app = Flask(__name__)
-
-books = [
-    {
-        'name': 'Green Eggs and Ham',
-        'price': 7.99,
-        'isbn': 234234234
-    },
-    {
-        'name': 'The Cat In the Hat',
-        'price': 6.99,
-        'isbn': 123123123
-    }
-]
+from flask import Flask, jsonify, request, Response
+from BookModel import *
+from settings import *
+import json
 
 
 def valid_post_request_data(bookObject):
@@ -30,21 +18,22 @@ def valid_put_request_data(bookObject):
 # GET /books
 @app.route('/books')
 def get_books():
-    return jsonify({'books': books})
+    return jsonify({'books': Book.get_all_books()})
+
+# GET /books/<isbn>
+@app.route('/books/<int:isbn>')
+def get_book_by_isbn(isbn):
+    return_value = Book.get_book(isbn)
+    return jsonify(return_value)
 
 # POST /books
 @app.route('/books', methods=['POST'])
 def add_book():
     request_data = request.get_json()
     if (valid_post_request_data(request_data)):
-        new_book = {
-            "name": request_data['name'],
-            "price":request_data['price'],
-            "isbn": request_data['isbn']
-        }
-        books.insert(0, new_book)
+        Book.add_book(request_data['name'], request_data['price'], request_data['isbn'])
         response = Response("", 201, mimetype='application/json')
-        response.headers['Location'] = "/books/" + str(new_book['isbn'])
+        response.headers['Location'] = "/books/" + str(request_data['isbn'])
         return response
     errorMsg = {
         "error": "Invalid book object passed in request",
@@ -52,18 +41,6 @@ def add_book():
     }
     response = Response(json.dumps(errorMsg), status=400, mimetype='application/json')
     return response
-
-# GET /books/<isbn>
-@app.route('/books/<int:isbn>')
-def get_book_by_isbn(isbn):
-    return_value = {}
-    for book in books:
-        if book["isbn"] == isbn:
-            return_value = {
-                'name': book["name"],
-                'price': book["price"]
-            }
-    return jsonify(return_value)
 
 # PUT /books/<isbn>
 @app.route('/books/<int:isbn>', methods=['PUT'])
@@ -79,20 +56,7 @@ def replace_book(isbn):
         response = Response(json.dumps(errorMsg), status=400, mimetype='application/json')
         return response
 
-    # New book data
-    new_book = {
-        'name': request_data['name'],
-        'price': request_data['price'],
-        'isbn': isbn
-    }
-
-    # Find and replace book data
-    for i in range(0, len(books)):
-        book = books[i]
-        currentIsbn = book['isbn']
-        if currentIsbn == isbn:
-            books[i] = new_book
-            break
+    Book.replace_book(isbn, request_data['name'], request_data['price'])
 
     response = Response("", status=204)
     return response
@@ -101,20 +65,12 @@ def replace_book(isbn):
 @app.route('/books/<int:isbn>', methods=['PATCH'])
 def update_book(isbn):
     request_data = request.get_json()
-    updated_book = {}
 
-    # What are we updating?
+    # Do the updates
     if "name" in request_data:
-        updated_book['name'] = request_data['name']
+        Book.update_book_name(isbn, request_data['name'])
     if "price" in request_data:
-        updated_book['price'] = request_data['price']
-
-    # Okay, find the book and update it
-    for i in range(0, len(books)):
-        book = books[i]
-        if book['isbn'] == isbn:
-            book.update(updated_book)
-            break
+        Book.update_book_price(isbn, request_data['price'])
     
     response = Response("", status=204)
     response.headers['Location'] = "/books/" + str(isbn)
@@ -123,12 +79,9 @@ def update_book(isbn):
 # DELETE /books/<isbn>
 @app.route('/books/<int:isbn>', methods=['DELETE'])
 def delete_book(isbn):
-    for i in range(0, len(books)):
-        book = books[i]
-        if book['isbn'] == isbn:
-            del books[i]
-            response = Response("", 204)
-            return response
+    if Book.delete_book(isbn):
+        response = Response("", 204)
+        return response
 
     errorMsg = {
         "error": "Book with ISBN " + str(isbn) + " not found."
