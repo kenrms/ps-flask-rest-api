@@ -15,6 +15,7 @@ books = [
     }
 ]
 
+
 def valid_post_request_data(bookObject):
     if ("name" in bookObject and "price" in bookObject and "isbn" in bookObject):
         return True
@@ -24,6 +25,7 @@ def valid_put_request_data(bookObject):
     if ("name" in bookObject and "price" in bookObject):
         return True
     return False
+
 
 # GET /books
 @app.route('/books')
@@ -117,5 +119,22 @@ def update_book(isbn):
     response = Response("", status=204)
     response.headers['Location'] = "/books/" + str(isbn)
     return response
+
+# DELETE /books/<isbn>
+@app.route('/books/<int:isbn>', methods=['DELETE'])
+def delete_book(isbn):
+    for i in range(0, len(books)):
+        book = books[i]
+        if book['isbn'] == isbn:
+            del books[i]
+            response = Response("", 204)
+            return response
+
+    errorMsg = {
+        "error": "Book with ISBN " + str(isbn) + " not found."
+    }            
+    response = Response(json.dumps(errorMsg), 404, mimetype='application/json')
+    return response
+
 
 app.run(port=5000, debug=True)
